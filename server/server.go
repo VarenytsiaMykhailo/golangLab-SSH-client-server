@@ -18,16 +18,7 @@ func main() {
 	fmt.Println(sl)
 	ssh.Handle(func(s ssh.Session) { //передаваемая функция - обрабатывает установленные сеансы
 		//defer s.Exit()
-		strOfCommands := s.RawCommand()
-		firstIndexOfSpace := strings.Index(strOfCommands, " ")
-		var sliceOfCommands []string //parsed
-		if firstIndexOfSpace != -1 {
-			sliceOfCommands = append(sliceOfCommands, strOfCommands[0:firstIndexOfSpace])
-			sliceOfCommands = append(sliceOfCommands, strOfCommands[firstIndexOfSpace+1:])
-		} else {
-			sliceOfCommands = append(sliceOfCommands, strOfCommands[0:])
-			sliceOfCommands = append(sliceOfCommands, "")
-		}
+		sliceOfCommands := parseCommands(s) //парсим команды клиента
 
 		if sliceOfCommands[0] == "ls" {
 			listDir(s, sliceOfCommands)
@@ -50,6 +41,20 @@ func main() {
 
 }
 
+func parseCommands(s ssh.Session) []string {
+	strOfCommands := s.RawCommand()
+	firstIndexOfSpace := strings.Index(strOfCommands, " ")
+	var sliceOfCommands []string //parsed
+	if firstIndexOfSpace != -1 {
+		sliceOfCommands = append(sliceOfCommands, strOfCommands[0:firstIndexOfSpace])
+		sliceOfCommands = append(sliceOfCommands, strOfCommands[firstIndexOfSpace+1:])
+	} else {
+		sliceOfCommands = append(sliceOfCommands, strOfCommands[0:])
+		sliceOfCommands = append(sliceOfCommands, "")
+	}
+	return sliceOfCommands
+}
+
 func listDir(s ssh.Session, sliceOfCommands []string) {
 	var path = ""
 	if sliceOfCommands[1] != "" {
@@ -63,7 +68,7 @@ func listDir(s ssh.Session, sliceOfCommands []string) {
 
 	dirsAndFiles, err := ioutil.ReadDir(rootPath + path) //инфа по содержимому в текущей папке (получаемый слайс - уже в отсортированном по имени виде)
 	if err != nil {
-		io.WriteString(s, "err") //отправляем ошибку клиенту
+		io.WriteString(s, err.Error()) //отправляем ошибку клиенту
 		return
 	}
 	var dirs string  //сюда заносим названия папок в директории Path
