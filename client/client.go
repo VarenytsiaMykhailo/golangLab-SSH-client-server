@@ -8,7 +8,12 @@ import (
 	"net"
 	"os"
 )
-
+/*
+127.0.0.1:2222
+PASSWORD
+iu9_31_05
+secret
+*/
 /*
 185.20.227.83:22
 PASSWORD
