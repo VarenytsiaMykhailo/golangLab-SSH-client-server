@@ -2,7 +2,6 @@ package main
 
 //https://godoc.org/github.com/gliderlabs/ssh
 import (
-	"fmt"
 	"github.com/gliderlabs/ssh"
 	"io"
 	"io/ioutil"
@@ -15,17 +14,19 @@ import (
 var rootPath = "./server/root/"
 
 func main() {
-	sl := []string{"1", "2", "3"}
-	fmt.Println(sl)
 	ssh.Handle(func(s ssh.Session) { //передаваемая функция - обрабатывает установленные сеансы
 		//defer s.Exit()
 		sliceOfCommands := parseCommands(s) //парсим команды клиента
 
 		switch sliceOfCommands[0] {
-		case "ls":
+		case "ls": //список содержимого папки
 			listDir(s, sliceOfCommands)
-		case "mkdir":
+		case "mkdir": //создать
 			mkdir(s, sliceOfCommands)
+		case "rm": //удалить папку\файл
+			rm(s, sliceOfCommands)
+		default:
+			io.WriteString(s, "incorrect command. Use commands: \"ls\" or \"ls dirName\" or \"mkdir dirName\"  or \"rm dirName\"") //отправляем ошибку клиенту
 		}
 	})
 
@@ -33,7 +34,6 @@ func main() {
 	log.Fatal(ssh.ListenAndServe("127.0.0.1:2222", nil, ssh.PasswordAuth(func(ctx ssh.Context, pass string) bool {
 		return pass == "secret" //тут можно перечислить пароли, с которыми будет пускать клиента на сервер (например secret)
 	})))
-
 	/*
 		2ой параметр - функция handler-обработчки. nil - юзать дефолтный
 		***
@@ -42,7 +42,6 @@ func main() {
 		Лучше создать или указать существующий ключ в вашей системе:
 		log.Fatal(ssh.ListenAndServe(":2222", nil, ssh.HostKeyFile("/Users/progrium/.ssh/id_rsa")))
 	*/
-
 }
 
 func parseCommands(s ssh.Session) []string {
@@ -63,7 +62,7 @@ func listDir(s ssh.Session, sliceOfCommands []string) {
 	var path = ""
 	if sliceOfCommands[1] != "" {
 		if sliceOfCommands[1][0:2] != "./" {
-			io.WriteString(s, "incorrect path. Use ex: \"./test dir/asd.txt\"") //отправляем ошибку клиенту
+			io.WriteString(s, "incorrect path. Use ex: \"ls ./test dir/asd.txt\" or \"ls\" for root path") //отправляем ошибку клиенту
 			return
 		}
 		path = sliceOfCommands[1][2:]
@@ -90,10 +89,24 @@ func mkdir(s ssh.Session, sliceOfCommands []string) {
 	if sliceOfCommands[1] != "" {
 		path = sliceOfCommands[1]
 	} else { //если название папки не было переданно
-		io.WriteString(s, "incorrect dir's name. Use ex: \"test dir\"") //отправляем ошибку клиенту
+		io.WriteString(s, "incorrect dir's name. Use ex: \"mkdir test dir\"") //отправляем ошибку клиенту
 		return
 	}
-	err := os.Mkdir(rootPath + path,0777) //0777 - максимальный уровень доступа к папке (полные права на чтение\запись). Можно регулировать http://www.rhd.ru/docs/manuals/enterprise/RHEL-AS-2.1-Manual/getting-started-guide/s1-navigating-chmodnum.html
+	err := os.Mkdir(rootPath+path, 0777) //0777 - максимальный уровень доступа к папке (полные права на чтение\запись). Можно регулировать http://www.rhd.ru/docs/manuals/enterprise/RHEL-AS-2.1-Manual/getting-started-guide/s1-navigating-chmodnum.html
+	if err != nil {
+		io.WriteString(s, err.Error()) //отправляем ошибку клиенту
+	}
+}
+
+func rm(s ssh.Session, sliceOfCommands []string) {
+	var path = ""
+	if sliceOfCommands[1] != "" {
+		path = sliceOfCommands[1]
+	} else { //если название папки не было переданно
+		io.WriteString(s, "incorrect dir's name. Use ex: \"rm test dir\"") //отправляем ошибку клиенту
+		return
+	}
+	err := os.RemoveAll(rootPath + path) //os.Remove удалит папку, если она поста или файл. os.RemoveAll удалит папку и все ее содержимое или файл
 	if err != nil {
 		io.WriteString(s, err.Error()) //отправляем ошибку клиенту
 	}
