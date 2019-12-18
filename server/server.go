@@ -7,6 +7,7 @@ import (
 	"io"
 	"io/ioutil"
 	"log"
+	"os"
 	"strconv"
 	"strings"
 )
@@ -20,8 +21,11 @@ func main() {
 		//defer s.Exit()
 		sliceOfCommands := parseCommands(s) //парсим команды клиента
 
-		if sliceOfCommands[0] == "ls" {
+		switch sliceOfCommands[0] {
+		case "ls":
 			listDir(s, sliceOfCommands)
+		case "mkdir":
+			mkdir(s, sliceOfCommands)
 		}
 	})
 
@@ -63,9 +67,7 @@ func listDir(s ssh.Session, sliceOfCommands []string) {
 			return
 		}
 		path = sliceOfCommands[1][2:]
-		println(path)//отладка
 	}
-
 	dirsAndFiles, err := ioutil.ReadDir(rootPath + path) //инфа по содержимому в текущей папке (получаемый слайс - уже в отсортированном по имени виде)
 	if err != nil {
 		io.WriteString(s, err.Error()) //отправляем ошибку клиенту
@@ -81,4 +83,18 @@ func listDir(s ssh.Session, sliceOfCommands []string) {
 		}
 	}
 	io.WriteString(s, dirs+files)
+}
+
+func mkdir(s ssh.Session, sliceOfCommands []string) {
+	var path = ""
+	if sliceOfCommands[1] != "" {
+		path = sliceOfCommands[1]
+	} else { //если название папки не было переданно
+		io.WriteString(s, "incorrect dir's name. Use ex: \"test dir\"") //отправляем ошибку клиенту
+		return
+	}
+	err := os.Mkdir(rootPath + path,0777) //0777 - максимальный уровень доступа к папке (полные права на чтение\запись). Можно регулировать http://www.rhd.ru/docs/manuals/enterprise/RHEL-AS-2.1-Manual/getting-started-guide/s1-navigating-chmodnum.html
+	if err != nil {
+		io.WriteString(s, err.Error()) //отправляем ошибку клиенту
+	}
 }
