@@ -8,6 +8,7 @@ import (
 	"io/ioutil"
 	"log"
 	"strconv"
+	"strings"
 )
 
 var rootPath = "./server/root/"
@@ -17,23 +18,19 @@ func main() {
 	fmt.Println(sl)
 	ssh.Handle(func(s ssh.Session) { //передаваемая функция - обрабатывает установленные сеансы
 		//defer s.Exit()
-		sliceOfCommands := s.Command()
+		strOfCommands := s.RawCommand()
+		firstIndexOfSpace := strings.Index(strOfCommands, " ")
+		var sliceOfCommands []string //parsed
+		if firstIndexOfSpace != -1 {
+			sliceOfCommands = append(sliceOfCommands, strOfCommands[0:firstIndexOfSpace])
+			sliceOfCommands = append(sliceOfCommands, strOfCommands[firstIndexOfSpace+1:])
+		} else {
+			sliceOfCommands = append(sliceOfCommands, strOfCommands[0:])
+			sliceOfCommands = append(sliceOfCommands, "")
+		}
+
 		if sliceOfCommands[0] == "ls" {
-			dirsAndFiles, err := ioutil.ReadDir(rootPath) //инфа по содержимому в текущей папке (получаемый слайс - уже в отсортированном по имени виде)
-			if err != nil {
-				io.WriteString(s, "err") //отправляем ошибку клиенту
-			}
-			var dirs string  //сюда заносим названия папок в директории Path
-			var files string //сюда заносим названия файлов в директории Path
-			for _, file := range dirsAndFiles { //перебор содержимого текущей папки
-				if file.IsDir() {
-					dirs += file.Name() + "\n"
-				} else { //если это файл, а не папка
-					files += file.Name() + " (" + strconv.Itoa(int(file.Size())) + "b)\n"
-				}
-			}
-			io.WriteString(s, dirs+files)
-			return
+			listDir(s, sliceOfCommands)
 		}
 	})
 
@@ -51,4 +48,32 @@ func main() {
 		log.Fatal(ssh.ListenAndServe(":2222", nil, ssh.HostKeyFile("/Users/progrium/.ssh/id_rsa")))
 	*/
 
+}
+
+func listDir(s ssh.Session, sliceOfCommands []string) {
+	var path = ""
+	if sliceOfCommands[1] != "" {
+		if sliceOfCommands[1][0:2] != "./" {
+			io.WriteString(s, "incorrect path. Use ex: \"./test dir/asd.txt\"") //отправляем ошибку клиенту
+			return
+		}
+		path = sliceOfCommands[1][2:]
+		println(path)//отладка
+	}
+
+	dirsAndFiles, err := ioutil.ReadDir(rootPath + path) //инфа по содержимому в текущей папке (получаемый слайс - уже в отсортированном по имени виде)
+	if err != nil {
+		io.WriteString(s, "err") //отправляем ошибку клиенту
+		return
+	}
+	var dirs string  //сюда заносим названия папок в директории Path
+	var files string //сюда заносим названия файлов в директории Path
+	for _, file := range dirsAndFiles { //перебор содержимого текущей папки
+		if file.IsDir() {
+			dirs += file.Name() + "\n"
+		} else { //если это файл, а не папка
+			files += file.Name() + " (" + strconv.Itoa(int(file.Size())) + "b)\n"
+		}
+	}
+	io.WriteString(s, dirs+files)
 }
